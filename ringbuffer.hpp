@@ -29,7 +29,7 @@ class RingBuffer {
       } else {
         //Split range
         std::copy(_entries.begin() + head, _entries.end(), new_vect.begin());
-        std::copy(_entries.begin(), _entries.begin() + tail, new_vect.begin() + (capacity - head))
+        std::copy(_entries.begin(), _entries.begin() + tail, new_vect.begin() + (capacity - head));
       }
       tail = wrap(tail - head);
       head = 0;
@@ -40,7 +40,7 @@ class RingBuffer {
 
   public:
 
-    RingBuffer() : capacity(2), cap_min1(capacity-1), _entries(capacity) 
+    RingBuffer() : capacity(2), cap_min1(capacity-1), _entries(capacity), 
         head(1), tail(0) { }
   
     T& operator[](size_t index) {

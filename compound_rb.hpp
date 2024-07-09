@@ -17,40 +17,48 @@
 template<class V, class T = double>
 class CompoundRingBuffer {
  private:
-  RingBuffer<T> _timestamp;
+  
   std::vector< RingBuffer<V> > _stateVars;
   std::vector<T> _maxDelays;
 
  public:
+  RingBuffer<T> _timestamp;
+  RingBuffer<T> _h;
   //Create a CRB to track N state variables, defining their maximum delays
   // and initial values with provided vectors whose lengths must be N
-  CompoundRingBuffer(size_t n, T t0, std::vector<T>&& max_delays, 
+  CompoundRingBuffer(size_t n, T t0, T h0, std::vector<T>&& max_delays, 
                     const std::vector<V>& init_vals): 
-      _timestamp(), _stateVars(n), _maxDelays(max_delays) { 
+      _timestamp(), _h(), _stateVars(n), _maxDelays(max_delays) { 
     //Add two copies of the initial entry to keep update logic simpler
     _timestamp[0] = t0;
     _timestamp.append_to_head(t0);
+    _h[0] = h0;
+    _h.append_to_head(h0);
     for (size_t index = 0; index < n; index++) {
       init_vals.at(index)[0] = init_vals[index];
       init_vals.at(index).append_to_head(init_vals[index]);
     }
   }
-  CompoundRingBuffer(size_t n, T t0, const std::vector<T>& max_delays, 
+  CompoundRingBuffer(size_t n, T t0, T h0, const std::vector<T>& max_delays, 
                     const std::vector<V>& init_vals): 
-      _timestamp(), _stateVars(n), _maxDelays(max_delays) { 
+      _timestamp(), _h(), _stateVars(n), _maxDelays(max_delays) { 
     assert(max_delays.size() >= n && init_vals.size() >= n);
     //Add two copies of the initial entry to keep update logic simpler
-    _timestamp[0] = t0;
+    _timestamp[0] = t0 - 1;
     _timestamp.append_to_head(t0);
+    _h[0] = h0;
+    _h.append_to_head(h0);
     for (size_t index = 0; index < n; index++) {
       _stateVars.at(index)[0] = init_vals[index];
       _stateVars.at(index).append_to_head(init_vals[index]);
     }
   }
+  CompoundRingBuffer() {}
 
-  void update(T t, const std::vector<V>& vals) {
+  void update(T t, T h, const std::vector<V>& vals) {
     bool append_any = false;
     assert(vals.size() >= _stateVars.size());
+
     for (size_t i = 0; i < _stateVars.size(); i++) {
       //If the timestamp of the new last item would still be more than 
       // maxDelay in the past for this state variable given the timestamp 
@@ -65,10 +73,13 @@ class CompoundRingBuffer {
     }
     if (append_any) {
       _timestamp.extend();
+      _h.extend();
     } else {
       _timestamp.advance();
+      _h.advance();
     }
     _timestamp[0] = t;
+    _h[0] = h;
   }
 
   size_t bisect(T target) const {
@@ -83,6 +94,11 @@ class CompoundRingBuffer {
       } else {
         start = mid+1;
       }
+    }
+
+    // reduce to most recent sample if _timestamp[start] == _timstamp[start-1] (might happen for initial case)
+    while ((_timestamp[start] != 0) && (_timestamp[start] == _timestamp[start-1])) {
+      start--;
     }
     return start;
   }
